@@ -18,11 +18,9 @@ const Sidebar = ({
   setActiveThreadId, 
   createNewThread 
 }) => {
-  // 'search' represents the main view. 'library' opens the drawer.
   const [activeView, setActiveView] = useState('search'); 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Logic: Clicking the same icon closes the drawer; clicking a different one switches views.
   const toggleView = (view) => {
     if (activeView === view && isDrawerOpen) {
       setIsDrawerOpen(false); 
@@ -34,17 +32,16 @@ const Sidebar = ({
 
   const handleNewThread = () => {
     createNewThread();
-    setActiveView('search'); // Reset to main view context
-    setIsDrawerOpen(false);  // Auto-close drawer to focus on chat
+    setActiveView('search');
+    setIsDrawerOpen(false);
   };
 
   return (
-    <div className="sidebar-container">
+    // ADDED: onMouseLeave handler to automatically close the drawer
+    <div className="sidebar-container" onMouseLeave={() => setIsDrawerOpen(false)}>
       
       {/* 1. Navigation Rail (Fixed Left) */}
       <div className="nav-rail">
-        
-        {/* Top: Actions */}
         <div className="rail-section top">
           <div 
             className="rail-item primary-action" 
@@ -79,7 +76,6 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* Bottom: User & Settings */}
         <div className="rail-section bottom">
           <div className="rail-item" data-tooltip="Settings">
             <Settings size={22} />
@@ -90,7 +86,7 @@ const Sidebar = ({
         </div>
       </div>
 
-      {/* 2. Side Drawer (Slide out panel) */}
+      {/* 2. Side Drawer */}
       <div className={`side-drawer ${isDrawerOpen ? 'open' : ''}`}>
         
         {/* Content for LIBRARY View */}
@@ -128,7 +124,6 @@ const Sidebar = ({
           </>
         )}
 
-        {/* Content for DISCOVER View (Placeholder) */}
         {activeView === 'discover' && (
           <>
             <div className="drawer-header">Discover</div>

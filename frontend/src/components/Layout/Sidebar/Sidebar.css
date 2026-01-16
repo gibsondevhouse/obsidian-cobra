@@ -3,12 +3,12 @@
   height: 100vh;
   position: relative;
   z-index: 50;
-  background: transparent; /* Ensure underlying glass effects work */
+  background: transparent;
 }
 
 /* --- 1. The Navigation Rail --- */
 .nav-rail {
-  width: 80px; /* Fixed slim width */
+  width: 80px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -16,13 +16,11 @@
   padding: 24px 0;
   background-color: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
-  z-index: 20;
-  /* Tahoe Glassmorphism Tokens */
+  z-index: 20; /* Keep rail above drawer */
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
-/* Rail Section Grouping */
 .rail-section {
   display: flex;
   flex-direction: column;
@@ -31,23 +29,16 @@
   align-items: center;
 }
 
-.rail-section.top {
-  margin-bottom: auto;
-}
+.rail-section.top { margin-bottom: auto; }
+.rail-section.bottom { margin-top: auto; padding-bottom: 16px; }
 
-.rail-section.bottom {
-  margin-top: auto;
-  padding-bottom: 16px;
-}
-
-/* Rail Item (Icon Button) */
 .rail-item {
   width: 48px;
   height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px; /* Superellipse shape */
+  border-radius: 12px;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -84,15 +75,12 @@
   z-index: 100;
 }
 
-.rail-item:hover::after {
-  opacity: 1;
-}
+.rail-item:hover::after { opacity: 1; }
 
-/* Primary Action (New Thread) */
 .rail-item.primary-action {
   background: var(--accent-lavender);
   color: #000;
-  border-radius: 50%; /* Circle */
+  border-radius: 50%;
   margin-bottom: 24px;
 }
 
@@ -102,24 +90,46 @@
   color: #fff;
 }
 
-/* --- 2. The Drawer (Library/Threads) --- */
+/* --- 2. The Drawer (UPDATED ANIMATION) --- */
 .side-drawer {
-  width: 0;
-  opacity: 0;
+  /* Positioning: Absolute allows smooth sliding without layout jank */
+  position: absolute;
+  left: 80px; /* Width of the nav rail */
+  top: 0;
+  height: 100%;
+  width: 280px;
+  z-index: 10; /* Sits behind the rail visually if they overlap */
+
+  /* Visuals */
   background-color: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  flex-direction: column;
-  /* Glass effect for the drawer specifically */
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
+
+  /* CLOSED STATE: Invisible, Blurry, Slightly shifted left */
+  opacity: 0;
+  filter: blur(10px); 
+  transform: translateX(-20px); 
+  pointer-events: none; /* Prevents clicking when hidden */
+
+  /* THE ANIMATION: Speed Ramp + Blur + Fade */
+  /* cubic-bezier(0.16, 1, 0.3, 1) creates a fast start and very smooth stop */
+  transition: 
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.4s ease-out,
+    filter 0.4s ease-out;
+    
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .side-drawer.open {
-  width: 280px;
+  /* OPEN STATE: Visible, Clear, In Place */
   opacity: 1;
+  filter: blur(0px);
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .drawer-header {
