@@ -1,17 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Plus, 
-  MessageSquare, 
   Search, 
-  Image, 
-  LayoutGrid, 
-  Terminal, 
-  Box,
+  Library, 
+  Globe, 
+  Settings, 
+  User,
+  MessageSquare,
   Folder,
-  ChevronDown,
-  MoreHorizontal,
-  Settings,
-  User
+  Hash
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -21,76 +18,130 @@ const Sidebar = ({
   setActiveThreadId, 
   createNewThread 
 }) => {
+  // 'search' represents the main view. 'library' opens the drawer.
+  const [activeView, setActiveView] = useState('search'); 
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Logic: Clicking the same icon closes the drawer; clicking a different one switches views.
+  const toggleView = (view) => {
+    if (activeView === view && isDrawerOpen) {
+      setIsDrawerOpen(false); 
+    } else {
+      setActiveView(view);
+      setIsDrawerOpen(true);
+    }
+  };
+
+  const handleNewThread = () => {
+    createNewThread();
+    setActiveView('search'); // Reset to main view context
+    setIsDrawerOpen(false);  // Auto-close drawer to focus on chat
+  };
+
   return (
-    <aside className="sidebar-container">
-      {/* Top Section */}
-      <div className="sidebar-section">
-        <SidebarItem icon={<Plus size={18} />} label="New chat" onClick={createNewThread} />
-        <SidebarItem icon={<Search size={18} />} label="Search chats" />
-        <SidebarItem icon={<Image size={18} />} label="Images" />
-        <SidebarItem icon={<LayoutGrid size={18} />} label="Apps" />
-        <SidebarItem icon={<Terminal size={18} />} label="Codex" />
-        <SidebarItem icon={<Box size={18} />} label="GPTs" />
-      </div>
+    <div className="sidebar-container">
+      
+      {/* 1. Navigation Rail (Fixed Left) */}
+      <div className="nav-rail">
+        
+        {/* Top: Actions */}
+        <div className="rail-section top">
+          <div 
+            className="rail-item primary-action" 
+            onClick={handleNewThread}
+            data-tooltip="New Thread"
+          >
+            <Plus size={24} />
+          </div>
 
-      {/* Projects Section */}
-      <div className="sidebar-label">Projects</div>
-      <div className="sidebar-section">
-        <SidebarItem icon={<Plus size={18} />} label="New project" />
-        <SidebarItem icon={<Folder size={18} />} label="Durango Domicile" />
-        <SidebarItem icon={<Folder size={18} />} label="Bible Study" />
-      </div>
+          <div 
+            className={`rail-item ${activeView === 'search' && !isDrawerOpen ? 'active' : ''}`}
+            onClick={() => { setActiveView('search'); setIsDrawerOpen(false); }}
+            data-tooltip="Search / Home"
+          >
+            <Search size={22} />
+          </div>
 
-      {/* Group Chats Section */}
-      <div className="sidebar-label">Group chats</div>
-      <div className="sidebar-section">
-        <SidebarItem 
-          icon={<div className="avatar-mini purple">MW</div>} 
-          label="Lily Draft 1" 
-        />
-        <SidebarItem 
-          icon={<div className="avatar-mini purple">MW</div>} 
-          label="Dream Analysis of Betrayal" 
-        />
-        <SidebarItem icon={<div className="avatar-mini outline">U</div>} label="New group chat" />
-      </div>
+          <div 
+            className={`rail-item ${activeView === 'library' && isDrawerOpen ? 'active' : ''}`}
+            onClick={() => toggleView('library')}
+            data-tooltip="Library & History"
+          >
+            <Library size={22} />
+          </div>
 
-      {/* Your Chats Section */}
-      <div className="sidebar-label">Your chats</div>
-      <div className="sidebar-section scrollable">
-        {threads.map(t => (
-          <SidebarItem 
-            key={t.id} 
-            icon={<MessageSquare size={16} />} 
-            label={t.title} 
-            active={activeThreadId === t.id}
-            onClick={() => setActiveThreadId(t.id)}
-          />
-        ))}
-      </div>
+          <div 
+            className={`rail-item ${activeView === 'discover' ? 'active' : ''}`}
+            onClick={() => toggleView('discover')}
+            data-tooltip="Discover"
+          >
+            <Globe size={22} />
+          </div>
+        </div>
 
-      {/* Footer Section */}
-      <div className="sidebar-footer">
-        <div className="user-profile">
-          <div className="avatar-circle">CG</div>
-          <div className="user-info">
-            <div className="user-name">Christopher Gibson</div>
-            <div className="user-plan">Plus</div>
+        {/* Bottom: User & Settings */}
+        <div className="rail-section bottom">
+          <div className="rail-item" data-tooltip="Settings">
+            <Settings size={22} />
+          </div>
+          <div className="rail-item" data-tooltip="Profile">
+            <User size={22} />
           </div>
         </div>
       </div>
-    </aside>
+
+      {/* 2. Side Drawer (Slide out panel) */}
+      <div className={`side-drawer ${isDrawerOpen ? 'open' : ''}`}>
+        
+        {/* Content for LIBRARY View */}
+        {activeView === 'library' && (
+          <>
+            <div className="drawer-header">Library</div>
+            <div className="drawer-content">
+              
+              <div className="drawer-section-label">Recent Chats</div>
+              {threads && threads.length > 0 ? (
+                threads.map(t => (
+                  <div 
+                    key={t.id} 
+                    className={`drawer-item ${activeThreadId === t.id ? 'active' : ''}`}
+                    onClick={() => { setActiveThreadId(t.id); }}
+                  >
+                    <MessageSquare size={16} />
+                    <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                      {t.title || 'Untitled Thread'}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="drawer-item" style={{opacity: 0.5}}>No history</div>
+              )}
+
+              <div className="drawer-section-label">Collections</div>
+              <div className="drawer-item"><Folder size={16} /> Project Alpha</div>
+              <div className="drawer-item"><Folder size={16} /> Research Notes</div>
+
+              <div className="drawer-section-label">Groups</div>
+              <div className="drawer-item"><Hash size={16} /> Engineering</div>
+              <div className="drawer-item"><Hash size={16} /> Design Team</div>
+            </div>
+          </>
+        )}
+
+        {/* Content for DISCOVER View (Placeholder) */}
+        {activeView === 'discover' && (
+          <>
+            <div className="drawer-header">Discover</div>
+            <div className="drawer-content">
+              <div className="drawer-item">Trending in Tech</div>
+              <div className="drawer-item">AI Developments</div>
+            </div>
+          </>
+        )}
+      </div>
+
+    </div>
   );
 };
-
-const SidebarItem = ({ icon, label, active, onClick }) => (
-  <div 
-    className={`sidebar-item ${active ? 'active' : ''}`} 
-    onClick={onClick}
-  >
-    <span className="sidebar-item-icon">{icon}</span>
-    <span className="sidebar-item-label">{label}</span>
-  </div>
-);
 
 export default Sidebar;
