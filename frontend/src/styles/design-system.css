@@ -141,30 +141,12 @@ body {
 
 .message-container {
   width: 100%;
-  max-width: 800px;
-  display: flex;
-  justify-content: center; /* Center the constrained content */
-  gap: 24px;
+  max-width: 680px; /* Centered reading measure */
+  margin: 0 auto;
   position: relative;
 }
 
-.avatar-container {
-  display: none; /* Hide avatars for Editorial View */
-}
-
-.avatar-container.user {
-  background: var(--accent-lavender);
-  color: #000;
-}
-
-.avatar-container.assistant {
-  background: #1a1a1a;
-  color: var(--accent-lavender);
-}
-
 .message-content {
-  flex: 1;
-  max-width: 680px; /* Optimal reading width */
   line-height: 1.8; /* Medium-style spacing */
   font-size: 18px; /* High-fidelity reading size */
   color: #ECECEC; /* Softer off-white for eye strain */

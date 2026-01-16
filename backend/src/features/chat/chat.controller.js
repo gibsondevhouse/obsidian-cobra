@@ -21,17 +21,19 @@ export const ChatController = {
         content: m.content
       }));
 
-      let messages = history;
+      const consultativeSystemPrompt = `You are a Senior Editor and Writing Consultant.
+YOUR GOAL: Produce world-class, high-impact content.
+CRITICAL BEHAVIOR:
+1. INTERCEPT: If the user asks you to "write" something (an article, code, email) but provides vague instructions, DO NOT generate content yet.
+2. CLARIFY: Ask 3-4 specific bulleted questions to define the Tone, Audience, and Core Idea.
+3. EXECUTE: Only generate the full content AFTER the user answers.`;
+
+      let messages = [{ role: 'system', content: consultativeSystemPrompt }, ...history];
+      
       if (mode === 'research') {
-        messages = [
-          { role: 'system', content: 'You are in RESEARCH mode. Provide a deep, structured analysis with citations and multi-perspective views. Begin by outlining your research steps.' },
-          ...history
-        ];
+        messages.push({ role: 'system', content: 'You are now in RESEARCH mode. Provide a deep, structured analysis with citations. Maintain your Senior Editor persona while conducting this research.' });
       } else if (mode === 'search') {
-        messages = [
-          { role: 'system', content: 'You are in SEARCH mode. Focus on providing factual, up-to-date information as if you just searched the live web. Use a concise, informative tone.' },
-          ...history
-        ];
+        messages.push({ role: 'system', content: 'You are now in SEARCH mode. Focus on factual, up-to-date information. Maintain your Senior Editor persona while searching.' });
       }
 
       // 3. Setup SSE

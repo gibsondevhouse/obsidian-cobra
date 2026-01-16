@@ -25,7 +25,7 @@ const MessageItem = ({ message }) => {
               {content}
             </ReactMarkdown>
           ) : (
-            content
+            <div className="user-text">{content}</div>
           )}
         </div>
       </div>
