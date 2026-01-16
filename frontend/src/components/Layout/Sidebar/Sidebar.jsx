@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Plus, 
   Search, 
-  Library, 
+  Archive, 
   Globe, 
   Settings, 
   User,
@@ -75,7 +75,7 @@ const Sidebar = ({
             onClick={() => toggleView('archives')}
             data-tooltip="Archives & History"
           >
-            <Library size={22} />
+            <Archive size={22} />
           </div>
 
           <div 

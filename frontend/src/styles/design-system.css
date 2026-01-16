@@ -31,7 +31,8 @@ body {
 }
 
 .app-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
@@ -141,20 +142,13 @@ body {
   width: 100%;
   max-width: 800px;
   display: flex;
+  justify-content: center; /* Center the constrained content */
   gap: 24px;
   position: relative;
 }
 
 .avatar-container {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  display: none; /* Hide avatars for Editorial View */
 }
 
 .avatar-container.user {
@@ -169,11 +163,21 @@ body {
 
 .message-content {
   flex: 1;
-  line-height: 1.7;
-  font-size: 15.5px;
+  max-width: 680px; /* Optimal reading width */
+  line-height: 1.8; /* Medium-style spacing */
+  font-size: 18px; /* Slightly larger for readability */
   color: #e0e0e0;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  font-family: 'Charter', 'Bitstream Charter', 'Sitka Text', 'Cambria', serif;
+}
+
+.reading-metadata {
+  font-family: var(--font-main); /* Keep metadata sans-serif */
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  opacity: 0.8;
 }
 
 .message-content p {

@@ -6,13 +6,20 @@ import { User, Bot } from 'lucide-react';
 const MessageItem = ({ message }) => {
   const { role, content } = message;
 
+  // Simple reading time calculation (approx 200 words per minute)
+  const getReadingTime = (text) => {
+    const words = text.split(/\s+/).length;
+    const minutes = Math.ceil(words / 200);
+    return `${minutes} min read`;
+  };
+
   return (
     <div className={`message-row ${role}`}>
       <div className="message-container">
-        <div className={`avatar-container ${role}`}>
-          {role === 'assistant' ? <Bot size={20} /> : <User size={20} />}
-        </div>
         <div className="message-content">
+          {role === 'assistant' && (
+            <div className="reading-metadata">{getReadingTime(content)}</div>
+          )}
           {role === 'assistant' ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {content}
