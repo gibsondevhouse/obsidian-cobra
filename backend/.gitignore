@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+*.local
+
+# Database
+src/features/memory/*.db
+*.db
+*.db-journal
+
+# Logs
+*.log
+npm-debug.log*
