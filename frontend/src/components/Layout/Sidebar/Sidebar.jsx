@@ -8,7 +8,8 @@ import {
   User,
   MessageSquare,
   Folder,
-  Hash
+  Hash,
+  Pin
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -18,12 +19,15 @@ const Sidebar = ({
   setActiveThreadId, 
   createNewThread 
 }) => {
+  // 'search' represents the main view. 'archives' opens the drawer.
   const [activeView, setActiveView] = useState('search'); 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
 
+  // Logic: Clicking the same icon closes the drawer (if not pinned); switching views opens/stays open.
   const toggleView = (view) => {
     if (activeView === view && isDrawerOpen) {
-      setIsDrawerOpen(false); 
+      if (!isPinned) setIsDrawerOpen(false); 
     } else {
       setActiveView(view);
       setIsDrawerOpen(true);
@@ -32,16 +36,23 @@ const Sidebar = ({
 
   const handleNewThread = () => {
     createNewThread();
-    setActiveView('search');
-    setIsDrawerOpen(false);
+    setActiveView('search'); 
+    if (!isPinned) setIsDrawerOpen(false); // Auto-close drawer if not pinned
+  };
+
+  const handleMouseLeave = () => {
+    if (!isPinned) {
+      setIsDrawerOpen(false);
+    }
   };
 
   return (
-    // ADDED: onMouseLeave handler to automatically close the drawer
-    <div className="sidebar-container" onMouseLeave={() => setIsDrawerOpen(false)}>
+    <div className="sidebar-container" onMouseLeave={handleMouseLeave}>
       
       {/* 1. Navigation Rail (Fixed Left) */}
       <div className="nav-rail">
+        
+        {/* Top: Actions */}
         <div className="rail-section top">
           <div 
             className="rail-item primary-action" 
@@ -52,17 +63,17 @@ const Sidebar = ({
           </div>
 
           <div 
-            className={`rail-item ${activeView === 'search' && !isDrawerOpen ? 'active' : ''}`}
-            onClick={() => { setActiveView('search'); setIsDrawerOpen(false); }}
+            className={`rail-item ${activeView === 'search' && (!isDrawerOpen || isPinned) ? 'active' : ''}`}
+            onClick={() => { setActiveView('search'); if (!isPinned) setIsDrawerOpen(false); }}
             data-tooltip="Search / Home"
           >
             <Search size={22} />
           </div>
 
           <div 
-            className={`rail-item ${activeView === 'library' && isDrawerOpen ? 'active' : ''}`}
-            onClick={() => toggleView('library')}
-            data-tooltip="Library & History"
+            className={`rail-item ${activeView === 'archives' && isDrawerOpen ? 'active' : ''}`}
+            onClick={() => toggleView('archives')}
+            data-tooltip="Archives & History"
           >
             <Library size={22} />
           </div>
@@ -76,6 +87,7 @@ const Sidebar = ({
           </div>
         </div>
 
+        {/* Bottom: User & Settings */}
         <div className="rail-section bottom">
           <div className="rail-item" data-tooltip="Settings">
             <Settings size={22} />
@@ -86,13 +98,22 @@ const Sidebar = ({
         </div>
       </div>
 
-      {/* 2. Side Drawer */}
+      {/* 2. Side Drawer (Slide out panel) */}
       <div className={`side-drawer ${isDrawerOpen ? 'open' : ''}`}>
         
-        {/* Content for LIBRARY View */}
-        {activeView === 'library' && (
+        {/* Content for ARCHIVES View */}
+        {(activeView === 'archives' || (activeView === 'search' && isDrawerOpen)) && (
           <>
-            <div className="drawer-header">Library</div>
+            <div className="drawer-header">
+              <span>Archives</span>
+              <button 
+                className={`pin-button ${isPinned ? 'active' : ''}`}
+                onClick={() => setIsPinned(!isPinned)}
+                title={isPinned ? "Unpin Drawer" : "Pin Drawer"}
+              >
+                <Pin size={16} />
+              </button>
+            </div>
             <div className="drawer-content">
               
               <div className="drawer-section-label">Recent Chats</div>
@@ -124,9 +145,19 @@ const Sidebar = ({
           </>
         )}
 
+        {/* Content for DISCOVER View */}
         {activeView === 'discover' && (
           <>
-            <div className="drawer-header">Discover</div>
+            <div className="drawer-header">
+              <span>Discover</span>
+              <button 
+                className={`pin-button ${isPinned ? 'active' : ''}`}
+                onClick={() => setIsPinned(!isPinned)}
+                title={isPinned ? "Unpin Drawer" : "Pin Drawer"}
+              >
+                <Pin size={16} />
+              </button>
+            </div>
             <div className="drawer-content">
               <div className="drawer-item">Trending in Tech</div>
               <div className="drawer-item">AI Developments</div>

@@ -86,6 +86,7 @@ body {
     #0a0a0a 100%
   );
   overflow: hidden;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .chat-feature-container {
