@@ -54,6 +54,7 @@ function App() {
         activeThreadId={activeThreadId} 
         mode={mode} 
         setMode={setMode} 
+        onMessageSent={fetchThreads}
       />
     </Layout>
   );

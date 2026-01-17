@@ -4,14 +4,16 @@ import ChatHeader from './components/ChatHeader/ChatHeader';
 import MessageStream from './components/MessageStream/MessageStream';
 import ChatInput from './components/ChatInput/ChatInput';
 
-const ChatFeature = ({ activeThreadId, mode, setMode }) => {
+const ChatFeature = ({ activeThreadId, mode, setMode, onMessageSent }) => {
   const {
     messages,
     inputValue,
     setInputValue,
     isStreaming,
-    handleSendMessage
-  } = useChatStream(activeThreadId, mode);
+    handleSendMessage,
+    connectionStatus,
+    retryLastMessage
+  } = useChatStream(activeThreadId, mode, onMessageSent);
 
   return (
     <div className="chat-feature-container">
@@ -25,7 +27,28 @@ const ChatFeature = ({ activeThreadId, mode, setMode }) => {
         onSend={handleSendMessage} 
         disabled={isStreaming} 
         mode={mode}
+        connectionStatus={connectionStatus}
+        onRetry={retryLastMessage}
       />
+      
+      {connectionStatus === 'disconnected' && (
+        <div style={{
+          position: 'absolute',
+          bottom: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(255, 59, 48, 0.9)',
+          color: 'white',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '12px',
+          backdropFilter: 'blur(10px)',
+          cursor: 'pointer',
+          zIndex: 100
+        }} onClick={retryLastMessage}>
+          ⚠ Offline - Click to Retry
+        </div>
+      )}
     </div>
   );
 };

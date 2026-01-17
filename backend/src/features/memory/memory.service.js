@@ -55,6 +55,12 @@ export const MemoryService = {
     return stmt.run(id, title, mode);
   },
 
+  updateThreadTitle: (id, title) => {
+    const cleanTitle = title.replace(/^"|"$/g, '').trim();
+    const stmt = db.prepare('UPDATE threads SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+    return stmt.run(cleanTitle, id);
+  },
+
   getThreads: () => {
     return db.prepare('SELECT * FROM threads ORDER BY updated_at DESC').all();
   },
@@ -64,14 +70,32 @@ export const MemoryService = {
   },
 
   // Message Management
-  addMessage: (id, threadId, role, content) => {
-    const stmt = db.prepare('INSERT INTO messages (id, thread_id, role, content) VALUES (?, ?, ?, ?)');
+  addMessage: (id, threadId, role, content, tokens = 0) => {
+    const stmt = db.prepare('INSERT INTO messages (id, thread_id, role, content, tokens) VALUES (?, ?, ?, ?, ?)');
     db.prepare('UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(threadId);
-    return stmt.run(id, threadId, role, content);
+    return stmt.run(id, threadId, role, content, tokens);
   },
 
-  getMessages: (threadId) => {
-    return db.prepare('SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at ASC').all(threadId);
+  getMessages: (threadId, charLimit = 15000) => {
+    // 1. Fetch latest messages first (DESC) so we prioritize recent context
+    // We fetch a reasonably large batch (e.g. 100) to ensure we have enough candidates
+    const rawMessages = db.prepare('SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at DESC LIMIT 100').all(threadId);
+    
+    // 2. Accumulate messages until we hit the character budget
+    const selectedMessages = [];
+    let currentChars = 0;
+
+    for (const msg of rawMessages) {
+      const msgLen = (msg.content || '').length;
+      if (currentChars + msgLen > charLimit) {
+        break; // Context window full
+      }
+      selectedMessages.push(msg);
+      currentChars += msgLen;
+    }
+
+    // 3. Reverse back to chronological order (ASC) for the LLM
+    return selectedMessages.reverse();
   },
 
   // Global Memory/Settings

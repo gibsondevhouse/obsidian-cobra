@@ -7,7 +7,7 @@ const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'gemma3:4b';
 
 export const ChatService = {
   async generateStream(messages, options = {}) {
-    const { model = DEFAULT_MODEL, stream = true } = options;
+    const { model = DEFAULT_MODEL, stream = true, signal } = options;
     
     try {
       const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
@@ -20,6 +20,7 @@ export const ChatService = {
           messages,
           stream,
         }),
+        signal, // Pass AbortSignal to fetch
       });
 
       if (!response.ok) {
@@ -30,6 +31,28 @@ export const ChatService = {
     } catch (error) {
       console.error('ChatService generateStream error:', error);
       throw error;
+    }
+  },
+
+  async generateResponse(messages, model) {
+    try {
+      const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: model || DEFAULT_MODEL,
+          messages,
+          stream: false
+        }),
+      });
+
+      if (!response.ok) throw new Error('Ollama Title Gen Failed');
+      
+      const data = await response.json();
+      return data.message.content;
+    } catch (error) {
+      console.error('ChatService generateResponse error:', error);
+      return null;
     }
   },
 

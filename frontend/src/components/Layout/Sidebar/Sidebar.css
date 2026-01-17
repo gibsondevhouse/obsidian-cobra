@@ -17,8 +17,9 @@
   background-color: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
   z-index: 20; 
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* High fidelity glass options */
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 .rail-section {
@@ -99,18 +100,21 @@
 
   background-color: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  
+  /* High fidelity glass */
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
 
   opacity: 0;
   filter: blur(10px); 
   transform: translateX(-20px); 
   pointer-events: none; 
+  will-change: width, transform, opacity, filter;
 
-  /* Matches cubic-bezier(0.16, 1, 0.3, 1) as requested */
+  /* Matches Apple-like snappy spring feel: cubic-bezier(0.25, 0.1, 0.25, 1.0) */
   transition: 
-    width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
+    transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1.0),
     opacity 0.4s ease-out,
     filter 0.4s ease-out;
     
@@ -165,7 +169,8 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  /* Prevent content from shrinking/wrapping during width transition */
+  /* Prevent content from shrinking/wrapping during width transition. 
+     This ensures the text just slides out of view masked, rather than crushing. */
   min-width: 280px;
 }
 

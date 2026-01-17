@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { chatApi } from '../api/chat.api';
 
-export const useChatStream = (activeThreadId, mode) => {
+export const useChatStream = (activeThreadId, mode, onMessageSent) => {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('connected'); // 'connected', 'connecting', 'disconnected'
 
   const fetchMessages = useCallback(async (id) => {
     try {
@@ -21,13 +22,16 @@ export const useChatStream = (activeThreadId, mode) => {
     }
   }, [activeThreadId, fetchMessages]);
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || isStreaming || !activeThreadId) return;
+  const handleSendMessage = async (textOverride = null) => {
+    const textToSend = textOverride || inputValue;
+    if (!textToSend.trim() || isStreaming || !activeThreadId) return;
 
-    const userMsg = { id: Date.now().toString(), role: 'user', content: inputValue };
+    // UI Updates
+    const userMsg = { id: Date.now().toString(), role: 'user', content: textToSend };
     setMessages(prev => [...prev, userMsg]);
-    setInputValue('');
+    if (!textOverride) setInputValue('');
     setIsStreaming(true);
+    setConnectionStatus('connecting');
 
     try {
       const response = await fetch(chatApi.streamUrl, {
@@ -35,11 +39,17 @@ export const useChatStream = (activeThreadId, mode) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           threadId: activeThreadId,
-          message: inputValue,
+          message: textToSend,
           mode: mode,
           model: 'gemma3:4b'
         })
       });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
+      setConnectionStatus('connected');
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -62,10 +72,14 @@ export const useChatStream = (activeThreadId, mode) => {
             const dataStr = line.slice(6);
             if (dataStr === '[DONE]') {
               setIsStreaming(false);
+              if (onMessageSent) onMessageSent(); // Trigger refresh
               continue;
             }
             try {
               const data = JSON.parse(dataStr);
+              if (data.error) {
+                 throw new Error(data.error);
+              }
               assistantContent += data.content;
               setMessages(prev => prev.map(m => 
                 m.id === assistantId ? { ...m, content: assistantContent } : m
@@ -79,6 +93,22 @@ export const useChatStream = (activeThreadId, mode) => {
     } catch (err) {
       console.error('Stream error:', err);
       setIsStreaming(false);
+      setConnectionStatus('disconnected');
+      
+      // Proactive System Alert
+      setMessages(prev => [...prev, {
+        id: 'system-error-' + Date.now(),
+        role: 'system',
+        content: `> [!CAUTION]\n> **Connection Failed**\n> Unable to connect to the Neural Engine (Ollama). Please ensure the backend is running.\n\n[Retry](${textToSend})` // Heuristic retry link or just text
+      }]);
+    }
+  };
+
+  const retryLastMessage = () => {
+    // Find last user message
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    if (lastUserMsg) {
+       handleSendMessage(lastUserMsg.content);
     }
   };
 
@@ -87,6 +117,8 @@ export const useChatStream = (activeThreadId, mode) => {
     inputValue,
     setInputValue,
     isStreaming,
-    handleSendMessage
+    connectionStatus,
+    handleSendMessage,
+    retryLastMessage
   };
 };
