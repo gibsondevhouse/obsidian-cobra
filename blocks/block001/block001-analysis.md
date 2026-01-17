@@ -1,0 +1,1 @@
+a description of the block, including any context files, and a comprehensive analysis of the issue including any files that may need to be changed and any second or third order levels of refactoring to expect to be made to resolve the issue

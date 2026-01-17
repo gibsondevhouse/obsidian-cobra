@@ -1,5 +1,6 @@
 import { useReducer, useCallback, useEffect } from 'react';
 import { chatApi } from '../api/chat.api';
+import { useChatContext } from '../context/ChatContext';
 
 // Action Types
 const ACTION_TYPES = {
@@ -90,6 +91,7 @@ const chatReducer = (state, action) => {
 
 export const useChatStream = (activeThreadId, mode, onMessageSent) => {
   const [state, dispatch] = useReducer(chatReducer, initialState);
+  const { searchContext } = useChatContext();
 
   const fetchMessages = useCallback(async (id) => {
     try {
@@ -120,13 +122,21 @@ export const useChatStream = (activeThreadId, mode, onMessageSent) => {
     // 1. Optimistic Update
     dispatch({ type: ACTION_TYPES.ADD_USER_MESSAGE, payload: userMsg });
 
+    // DYNAMICALLY INJECT CONTEXT
+    // If the user's message mentions a file or topic, we search the context
+    const relevantCode = searchContext(textToSend);
+    
+    const finalMessage = relevantCode 
+      ? `[CONTEXT FILES FOUND]\n${relevantCode}\n\n[USER QUERY]\n${textToSend}`
+      : textToSend;
+
     try {
       const response = await fetch(chatApi.streamUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           threadId: activeThreadId,
-          message: textToSend,
+          message: finalMessage,
           mode: mode,
           model: 'gemma3:4b'
         })

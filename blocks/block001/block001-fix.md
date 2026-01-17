@@ -1,0 +1,1 @@
+how the block was fixed, including any changes to the code, data, or any other files during the entirety of the process of rectifying the issue

@@ -1,10 +1,11 @@
 import React from 'react';
 import { useChatStream } from './hooks/useChatStream';
+import { ChatProvider } from './context/ChatContext';
 import ChatHeader from './components/ChatHeader/ChatHeader';
 import MessageStream from './components/MessageStream/MessageStream';
 import ChatInput from './components/ChatInput/ChatInput';
 
-const ChatFeature = ({ activeThreadId, mode, setMode, onMessageSent }) => {
+const ChatFeatureContent = ({ activeThreadId, mode, setMode, onMessageSent }) => {
   const {
     messages,
     inputValue,
@@ -54,5 +55,11 @@ const ChatFeature = ({ activeThreadId, mode, setMode, onMessageSent }) => {
     </div>
   );
 };
+
+const ChatFeature = (props) => (
+  <ChatProvider>
+    <ChatFeatureContent {...props} />
+  </ChatProvider>
+);
 
 export default ChatFeature;
