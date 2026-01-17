@@ -12,7 +12,8 @@ const ChatFeature = ({ activeThreadId, mode, setMode, onMessageSent }) => {
     isStreaming,
     handleSendMessage,
     connectionStatus,
-    retryLastMessage
+    retryLastMessage,
+    contextUsage
   } = useChatStream(activeThreadId, mode, onMessageSent);
 
   return (
@@ -29,6 +30,7 @@ const ChatFeature = ({ activeThreadId, mode, setMode, onMessageSent }) => {
         mode={mode}
         connectionStatus={connectionStatus}
         onRetry={retryLastMessage}
+        usage={contextUsage}
       />
       
       {connectionStatus === 'disconnected' && (

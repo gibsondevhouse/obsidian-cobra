@@ -5,6 +5,7 @@ import { SearchService } from '../search/search.service.js';
 
 export const ChatController = {
   streamResponse: async (req, res) => {
+
     const { threadId, message, model, mode } = req.body;
     
     // Auto-titling check
@@ -21,11 +22,17 @@ export const ChatController = {
       'X-Accel-Buffering': 'no' // Crucial for Nginx/Proxies
     });
 
+
+
     // 2. Handle Client Disconnect (Stop generating if user leaves)
+    // Note: 'close' event was firing prematurely, potentially due to proxy/network layer.
+    // Disabling auto-abort for now to ensure stream reliability.
+    /*
     req.on('close', () => {
       abortController.abort();
       res.end();
     });
+    */
 
     try {
       const thread = MemoryService.getThread(threadId);
@@ -42,6 +49,11 @@ export const ChatController = {
         role: m.role,
         content: m.content
       }));
+
+      // Calculate Tokens & Send Usage Packet
+      const currentTokens = MemoryService.getThreadTokenCount(threadId);
+      const maxContext = 8192; // gemma3:4b limit
+      res.write(`data: ${JSON.stringify({ type: 'usage', current: currentTokens, max: maxContext })}\n\n`);
 
       // 5. Mode-Specific System Prompts
       const consultativeSystemPrompt = `You are a Senior Editor and Writing Consultant.
@@ -83,7 +95,7 @@ CRITICAL BEHAVIOR:
       // 7. Execute Stream
       const stream = await ChatService.generateStream(messages, { 
         model, 
-        signal: abortController.signal // Pass abort signal to Ollama service
+        // Signal disabled to prevent premature termination with Node fetch
       });
       
       const reader = stream.getReader();
@@ -93,50 +105,55 @@ CRITICAL BEHAVIOR:
       let buffer = '';
       let tokensUsed = 0;
 
+      const processLine = (line) => {
+        if (!line.trim()) return;
+        try {
+          const parsed = JSON.parse(line);
+          
+          if (parsed.message?.content) {
+            fullResponse += parsed.message.content;
+            res.write(`data: ${JSON.stringify({ type: 'content', content: parsed.message.content })}\n\n`);
+          }
+
+          if (parsed.done) {
+            tokensUsed = parsed.eval_count || 0;
+            MemoryService.addMessage(
+              uuidv4(), 
+              threadId, 
+              'assistant', 
+              fullResponse,
+              tokensUsed 
+            );
+            res.write(`data: [DONE]\n\n`);
+          }
+        } catch (parseError) {
+          console.warn('Skipping malformed JSON line:', line);
+        }
+      };
+
+
+
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
         
-        // Robust Line Parsing (Handling chunks ending mid-line)
-        const lines = buffer.split('\n');
-        buffer = lines.pop(); // Keep incomplete line in buffer
+        if (value) {
+          buffer += decoder.decode(value, { stream: !done });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); 
+          lines.forEach(processLine);
+        }
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          
-          try {
-            const parsed = JSON.parse(line);
-            
-            // Handle Content
-            if (parsed.message?.content) {
-              fullResponse += parsed.message.content;
-              res.write(`data: ${JSON.stringify({ content: parsed.message.content })}\n\n`);
-            }
-
-            // Handle Metadata (Final Packet)
-            if (parsed.done) {
-              tokensUsed = parsed.eval_count || 0;
-              
-              // 8. Persist Assistant Message with Metadata
-              MemoryService.addMessage(
-                uuidv4(), 
-                threadId, 
-                'assistant', 
-                fullResponse,
-                tokensUsed // Saving token count
-              );
-              
-              res.write(`data: [DONE]\n\n`);
-            }
-          } catch (parseError) {
-            console.warn('Skipping malformed JSON line:', line);
+        if (done) {
+          // Process remaining buffer
+          if (buffer.trim()) {
+            processLine(buffer);
           }
+          break;
         }
       }
       
       res.end();
+
 
       // Background Task: Auto-Title the Thread
       if (shouldAutoTitle) {

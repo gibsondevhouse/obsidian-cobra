@@ -1,16 +1,100 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useReducer, useCallback, useEffect } from 'react';
 import { chatApi } from '../api/chat.api';
 
+// Action Types
+const ACTION_TYPES = {
+  SET_MESSAGES: 'SET_MESSAGES',
+  ADD_USER_MESSAGE: 'ADD_USER_MESSAGE',
+  START_STREAM: 'START_STREAM',
+  UPDATE_STREAM: 'UPDATE_STREAM',
+  UPDATE_USAGE: 'UPDATE_USAGE',
+  STREAM_ERROR: 'STREAM_ERROR',
+  END_STREAM: 'END_STREAM',
+  SET_INPUT: 'SET_INPUT',
+  SET_CONNECTION_STATUS: 'SET_CONNECTION_STATUS'
+};
+
+// Initial State
+const initialState = {
+  messages: [],
+  inputValue: '',
+  isStreaming: false,
+  connectionStatus: 'connected',
+  contextUsage: { current: 0, max: 8192 }
+};
+
+// Reducer
+const chatReducer = (state, action) => {
+  switch (action.type) {
+    case ACTION_TYPES.SET_MESSAGES:
+      return { ...state, messages: action.payload };
+
+    case ACTION_TYPES.ADD_USER_MESSAGE:
+      return {
+        ...state,
+        messages: [...state.messages, action.payload],
+        inputValue: '',
+        isStreaming: true,
+        connectionStatus: 'connecting'
+      };
+
+    case ACTION_TYPES.START_STREAM:
+      // Ensure we don't duplicate the assistant message if it already exists (safety check)
+      if (state.messages.some(m => m.id === action.payload.id)) {
+        return state;
+      }
+      return {
+        ...state,
+        connectionStatus: 'connected',
+        messages: [...state.messages, { ...action.payload, content: '' }]
+      };
+
+    case ACTION_TYPES.UPDATE_STREAM:
+      return {
+        ...state,
+        messages: state.messages.map(msg => 
+          msg.id === action.payload.id 
+            ? { ...msg, content: msg.content + action.payload.content }
+            : msg
+        )
+      };
+
+    case ACTION_TYPES.UPDATE_USAGE:
+      return { ...state, contextUsage: action.payload };
+
+    case ACTION_TYPES.STREAM_ERROR:
+      return {
+        ...state,
+        isStreaming: false,
+        connectionStatus: 'disconnected',
+        messages: [...state.messages, {
+          id: `error-${Date.now()}`,
+          role: 'system',
+          content: `> [!CAUTION]\n> **Stream Error**\n> ${action.payload}`
+        }]
+      };
+
+    case ACTION_TYPES.END_STREAM:
+      return { ...state, isStreaming: false };
+
+    case ACTION_TYPES.SET_INPUT:
+      return { ...state, inputValue: action.payload };
+      
+    case ACTION_TYPES.SET_CONNECTION_STATUS:
+      return { ...state, connectionStatus: action.payload };
+
+    default:
+      return state;
+  }
+};
+
 export const useChatStream = (activeThreadId, mode, onMessageSent) => {
-  const [messages, setMessages] = useState([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState('connected'); // 'connected', 'connecting', 'disconnected'
+  const [state, dispatch] = useReducer(chatReducer, initialState);
 
   const fetchMessages = useCallback(async (id) => {
     try {
       const res = await chatApi.fetchMessages(id);
-      setMessages(res.data);
+      dispatch({ type: ACTION_TYPES.SET_MESSAGES, payload: res.data });
     } catch (err) {
       console.error('Fetch messages error:', err);
     }
@@ -22,16 +106,19 @@ export const useChatStream = (activeThreadId, mode, onMessageSent) => {
     }
   }, [activeThreadId, fetchMessages]);
 
-  const handleSendMessage = async (textOverride = null) => {
-    const textToSend = textOverride || inputValue;
-    if (!textToSend.trim() || isStreaming || !activeThreadId) return;
+  const setInputValue = (value) => {
+    dispatch({ type: ACTION_TYPES.SET_INPUT, payload: value });
+  };
 
-    // UI Updates
-    const userMsg = { id: Date.now().toString(), role: 'user', content: textToSend };
-    setMessages(prev => [...prev, userMsg]);
-    if (!textOverride) setInputValue('');
-    setIsStreaming(true);
-    setConnectionStatus('connecting');
+  const handleSendMessage = async (textOverride = null) => {
+    const textToSend = textOverride || state.inputValue;
+    if (!textToSend.trim() || state.isStreaming || !activeThreadId) return;
+
+    const userMsgId = Date.now().toString();
+    const userMsg = { id: userMsgId, role: 'user', content: textToSend };
+    
+    // 1. Optimistic Update
+    dispatch({ type: ACTION_TYPES.ADD_USER_MESSAGE, payload: userMsg });
 
     try {
       const response = await fetch(chatApi.streamUrl, {
@@ -49,16 +136,21 @@ export const useChatStream = (activeThreadId, mode, onMessageSent) => {
         throw new Error(`Server responded with ${response.status}`);
       }
 
-      setConnectionStatus('connected');
+      dispatch({ type: ACTION_TYPES.SET_CONNECTION_STATUS, payload: 'connected' });
 
+      // 2. Initialize Stream Reading
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let assistantContent = '';
-      
       const assistantId = 'assistant-' + Date.now();
-      setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
+      
+      // 3. Create Placeholder Message
+      dispatch({ 
+        type: ACTION_TYPES.START_STREAM, 
+        payload: { id: assistantId, role: 'assistant' } 
+      });
 
       let buffer = '';
+      
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -68,56 +160,62 @@ export const useChatStream = (activeThreadId, mode, onMessageSent) => {
         buffer = lines.pop(); 
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6);
-            if (dataStr === '[DONE]') {
-              setIsStreaming(false);
-              if (onMessageSent) onMessageSent(); // Trigger refresh
-              continue;
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          
+          const dataStr = trimmed.slice(6);
+          if (dataStr === '[DONE]') {
+            dispatch({ type: ACTION_TYPES.END_STREAM });
+            if (onMessageSent) onMessageSent(); 
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(dataStr);
+            
+            if (parsed.type === 'usage') {
+              dispatch({ 
+                type: ACTION_TYPES.UPDATE_USAGE, 
+                payload: { current: parsed.current, max: parsed.max } 
+              });
+            } else if (parsed.content) {
+              dispatch({ 
+                type: ACTION_TYPES.UPDATE_STREAM, 
+                payload: { id: assistantId, content: parsed.content } 
+              });
+            } else if (parsed.error) {
+              throw new Error(parsed.error);
             }
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.error) {
-                 throw new Error(data.error);
-              }
-              assistantContent += data.content;
-              setMessages(prev => prev.map(m => 
-                m.id === assistantId ? { ...m, content: assistantContent } : m
-              ));
-            } catch (error) {
-              console.error('Data parsing error in hook:', error, 'Line:', line);
-            }
+          } catch (error) {
+            console.error('Stream processing error:', error);
+            dispatch({ type: ACTION_TYPES.STREAM_ERROR, payload: error.message });
+            return; 
           }
         }
       }
     } catch (err) {
       console.error('Stream error:', err);
-      setIsStreaming(false);
-      setConnectionStatus('disconnected');
-      
-      // Proactive System Alert
-      setMessages(prev => [...prev, {
-        id: 'system-error-' + Date.now(),
-        role: 'system',
-        content: `> [!CAUTION]\n> **Connection Failed**\n> Unable to connect to the Neural Engine (Ollama). Please ensure the backend is running.\n\n[Retry](${textToSend})` // Heuristic retry link or just text
-      }]);
+      dispatch({ 
+        type: ACTION_TYPES.STREAM_ERROR, 
+        payload: `Unable to connect to the Neural Engine (Ollama). Please ensure the backend is running. (${err.message})` 
+      });
     }
   };
 
   const retryLastMessage = () => {
-    // Find last user message
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    const lastUserMsg = [...state.messages].reverse().find(m => m.role === 'user');
     if (lastUserMsg) {
        handleSendMessage(lastUserMsg.content);
     }
   };
 
   return {
-    messages,
-    inputValue,
+    messages: state.messages,
+    inputValue: state.inputValue,
     setInputValue,
-    isStreaming,
-    connectionStatus,
+    isStreaming: state.isStreaming,
+    contextUsage: state.contextUsage,
+    connectionStatus: state.connectionStatus,
     handleSendMessage,
     retryLastMessage
   };

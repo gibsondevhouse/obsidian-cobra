@@ -19,34 +19,94 @@ if (!fs.existsSync(dbDir)) {
 
 const db = new Database(dbPath);
 
-// Initialize Tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS threads (
-    id TEXT PRIMARY KEY,
-    title TEXT,
-    mode TEXT DEFAULT 'chat',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+// ------------------------------------------------------------------
+// Robust Migration System (Industry Standard)
+// ------------------------------------------------------------------
 
-  CREATE TABLE IF NOT EXISTS messages (
-    id TEXT PRIMARY KEY,
-    thread_id TEXT,
-    role TEXT,
-    content TEXT,
-    tokens INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
-  );
+const MIGRATIONS = [
+  {
+    version: 1,
+    name: 'Initial Schema',
+    up: (database) => {
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS threads (
+          id TEXT PRIMARY KEY,
+          title TEXT,
+          mode TEXT DEFAULT 'chat',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
 
-  CREATE TABLE IF NOT EXISTS memory_fragments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    key TEXT,
-    value TEXT,
-    type TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+        CREATE TABLE IF NOT EXISTS messages (
+          id TEXT PRIMARY KEY,
+          thread_id TEXT,
+          role TEXT,
+          content TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS memory_fragments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key TEXT,
+          value TEXT,
+          type TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    }
+  },
+  {
+    version: 2,
+    name: 'Add Tokens and Metadata',
+    up: (database) => {
+      // Safe Column Addition Helper
+      const addColumnSafe = (table, colName, colDef) => {
+        const cols = database.prepare(`PRAGMA table_info(${table})`).all();
+        if (!cols.some(c => c.name === colName)) {
+          console.log(`[Migration v2] Adding ${table}.${colName}...`);
+          database.prepare(`ALTER TABLE ${table} ADD COLUMN ${colName} ${colDef}`).run();
+        }
+      };
+
+      addColumnSafe('messages', 'tokens', 'INTEGER DEFAULT 0');
+      addColumnSafe('threads', 'title', 'TEXT DEFAULT "New Session"');
+    }
+  }
+];
+
+const runMigrations = (database) => {
+  const currentVersion = database.prepare('PRAGMA user_version').get().user_version;
+  console.log(`[Database] Current Schema Version: ${currentVersion}`);
+
+  const pendingFn = MIGRATIONS.filter(m => m.version > currentVersion);
+
+  if (pendingFn.length > 0) {
+    console.log(`[Database] Found ${pendingFn.length} pending migrations.`);
+    
+    // Execute all pending migrations in a single transaction for safety
+    const transaction = database.transaction(() => {
+      for (const migration of pendingFn) {
+        console.log(`[Database] Applying v${migration.version}: ${migration.name}...`);
+        migration.up(database);
+        database.prepare(`PRAGMA user_version = ${migration.version}`).run();
+      }
+    });
+
+    try {
+      transaction();
+      console.log('[Database] Migrations applied successfully.');
+    } catch (error) {
+      console.error('[Database] CRITICAL: Migration failed. Rolling back.', error);
+      throw error; // Prevent app startup on schema failure
+    }
+  } else {
+    console.log('[Database] Schema is up to date.');
+  }
+};
+
+// Initialize Database & Run Migrations
+runMigrations(db);
 
 export const MemoryService = {
   // Thread Management
@@ -71,9 +131,22 @@ export const MemoryService = {
 
   // Message Management
   addMessage: (id, threadId, role, content, tokens = 0) => {
+    // Basic estimation if tokens not provided (approx 4 chars per token)
+    const estimatedTokens = tokens || Math.ceil(content.length / 4);
+    
     const stmt = db.prepare('INSERT INTO messages (id, thread_id, role, content, tokens) VALUES (?, ?, ?, ?, ?)');
     db.prepare('UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(threadId);
-    return stmt.run(id, threadId, role, content, tokens);
+    return stmt.run(id, threadId, role, content, estimatedTokens);
+  },
+
+  getThreadTokenCount: (threadId) => {
+    try {
+      const result = db.prepare('SELECT SUM(tokens) as total FROM messages WHERE thread_id = ?').get(threadId);
+      return result.total || 0;
+    } catch (err) {
+      console.warn('MemoryService: Failed to get token count (suppressing):', err.message);
+      return 0; // Fallback to 0 to prevent blocking chat
+    }
   },
 
   getMessages: (threadId, charLimit = 15000) => {
