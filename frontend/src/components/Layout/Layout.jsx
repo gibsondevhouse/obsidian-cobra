@@ -6,7 +6,8 @@ const Layout = ({
   threads, 
   activeThreadId, 
   setActiveThreadId, 
-  createNewThread 
+  createNewThread,
+  deleteThread // Added prop
 }) => {
   return (
     <div className="app-layout">
@@ -15,6 +16,7 @@ const Layout = ({
         activeThreadId={activeThreadId} 
         setActiveThreadId={setActiveThreadId} 
         createNewThread={createNewThread} 
+        deleteThread={deleteThread} // Passed down
       />
       <main className="feature-content">
         {children}

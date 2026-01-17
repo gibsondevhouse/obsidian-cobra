@@ -9,22 +9,24 @@ import {
   MessageSquare,
   Folder,
   Hash,
-  Pin
+  Pin,
+  X 
 } from 'lucide-react';
+import NavSection from './NavSection';
 import './Sidebar.css';
 
 const Sidebar = ({ 
   threads, 
   activeThreadId, 
   setActiveThreadId, 
-  createNewThread 
+  createNewThread,
+  deleteThread
 }) => {
-  // 'search' represents the main view. 'archives' opens the drawer.
   const [activeView, setActiveView] = useState('search'); 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
 
-  // Logic: Clicking the same icon closes the drawer (if not pinned); switching views opens/stays open.
+  // Toggle View Logic
   const toggleView = (view) => {
     if (activeView === view && isDrawerOpen) {
       if (!isPinned) setIsDrawerOpen(false); 
@@ -37,7 +39,7 @@ const Sidebar = ({
   const handleNewThread = () => {
     createNewThread();
     setActiveView('search'); 
-    if (!isPinned) setIsDrawerOpen(false); // Auto-close drawer if not pinned
+    if (!isPinned) setIsDrawerOpen(false);
   };
 
   const handleMouseLeave = () => {
@@ -46,13 +48,67 @@ const Sidebar = ({
     }
   };
 
+  const handleDeleteClick = (e, threadId) => {
+    e.stopPropagation();
+    if (confirm('Permanently delete this project?')) {
+      deleteThread(threadId);
+    }
+  };
+
+  // Mock Data Generators for "Load More" demonstration
+  const articlesMock = Array.from({ length: 20 }, (_, i) => ({
+    id: `art-${i}`,
+    title: `Article Draft ${i + 1}: The Future of AI`,
+    icon: Folder
+  }));
+
+  const novelsMock = Array.from({ length: 15 }, (_, i) => ({
+    id: `nov-${i}`,
+    title: `Chapter ${i + 1}: The Awakening`,
+    icon: Hash
+  }));
+
+  // Render Helpers
+  const renderThreadItem = (t) => (
+    <div 
+      key={t.id} 
+      className={`drawer-item group ${activeThreadId === t.id ? 'active' : ''}`}
+      onClick={() => setActiveThreadId(t.id)}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+        <MessageSquare size={16} style={{ flexShrink: 0 }} />
+        <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+          {t.title || 'Untitled Thread'}
+        </span>
+      </div>
+      <button 
+        className="delete-btn"
+        onClick={(e) => handleDeleteClick(e, t.id)}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+
+  const renderGenericItem = (item) => {
+    const Icon = item.icon;
+    return (
+      <div key={item.id} className="drawer-item">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+          <Icon size={16} style={{ flexShrink: 0 }} />
+          <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+            {item.title}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="sidebar-container" onMouseLeave={handleMouseLeave}>
       
-      {/* 1. Navigation Rail (Fixed Left) */}
+      {/* 1. Navigation Rail */}
       <div className="nav-rail">
-        
-        {/* Top: Actions */}
         <div className="rail-section top">
           <div 
             className="rail-item primary-action" 
@@ -87,7 +143,6 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* Bottom: User & Settings */}
         <div className="rail-section bottom">
           <div className="rail-item" data-tooltip="Settings">
             <Settings size={22} />
@@ -98,10 +153,9 @@ const Sidebar = ({
         </div>
       </div>
 
-      {/* 2. Side Drawer (Slide out panel) */}
+      {/* 2. Side Drawer */}
       <div className={`side-drawer ${isDrawerOpen ? 'open' : ''}`}>
         
-        {/* Content for ARCHIVES View */}
         {(activeView === 'archives' || (activeView === 'search' && isDrawerOpen)) && (
           <>
             <div className="drawer-header">
@@ -114,33 +168,34 @@ const Sidebar = ({
                 <Pin size={16} />
               </button>
             </div>
-            <div className="drawer-content">
+            
+            {/* Scrollable Content Area with Custom Scrollbar */}
+            <div className="drawer-content custom-scroll">
               
-              <div className="drawer-section-label">Recent Chats</div>
-              {threads && threads.length > 0 ? (
-                threads.map(t => (
-                  <div 
-                    key={t.id} 
-                    className={`drawer-item ${activeThreadId === t.id ? 'active' : ''}`}
-                    onClick={() => { setActiveThreadId(t.id); }}
-                  >
-                    <MessageSquare size={16} />
-                    <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                      {t.title || 'Untitled Thread'}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div className="drawer-item" style={{opacity: 0.5}}>No history</div>
-              )}
+              {/* Recent Chats Section */}
+              <NavSection 
+                title="Recent Chats" 
+                items={threads || []} 
+                renderItem={renderThreadItem}
+                initialVisible={7}
+              />
 
-              <div className="drawer-section-label">Collections</div>
-              <div className="drawer-item"><Folder size={16} /> Project Alpha</div>
-              <div className="drawer-item"><Folder size={16} /> Research Notes</div>
+              {/* Articles Section (Mock) */}
+              <NavSection 
+                title="Articles" 
+                items={articlesMock} 
+                renderItem={renderGenericItem}
+                initialVisible={5}
+              />
 
-              <div className="drawer-section-label">Groups</div>
-              <div className="drawer-item"><Hash size={16} /> Engineering</div>
-              <div className="drawer-item"><Hash size={16} /> Design Team</div>
+              {/* Novels Section (Mock) */}
+              <NavSection 
+                title="Novels" 
+                items={novelsMock} 
+                renderItem={renderGenericItem}
+                initialVisible={5}
+              />
+
             </div>
           </>
         )}
@@ -158,7 +213,7 @@ const Sidebar = ({
                 <Pin size={16} />
               </button>
             </div>
-            <div className="drawer-content">
+            <div className="drawer-content custom-scroll">
               <div className="drawer-item">Trending in Tech</div>
               <div className="drawer-item">AI Developments</div>
             </div>

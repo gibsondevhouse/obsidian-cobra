@@ -110,9 +110,17 @@ runMigrations(db);
 
 export const MemoryService = {
   // Thread Management
+
   createThread: (id, title, mode = 'chat') => {
     const stmt = db.prepare('INSERT INTO threads (id, title, mode) VALUES (?, ?, ?)');
     return stmt.run(id, title, mode);
+  },
+
+  deleteThread: (id) => {
+    const stmt = db.prepare('DELETE FROM threads WHERE id = ?');
+    stmt.run(id); // Using stmt.run() but ignoring return for simplicity or return it
+    // User implementation returned stmt.run(id) which returns RunResult.
+    return stmt.run(id);
   },
 
   updateThreadTitle: (id, title) => {

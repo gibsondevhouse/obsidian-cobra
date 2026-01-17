@@ -24,6 +24,17 @@ export const MemoryController = {
     }
   },
 
+  deleteThread: (req, res) => {
+    try {
+      const { id } = req.params;
+      MemoryService.deleteThread(id);
+      res.json({ success: true, id });
+    } catch (error) {
+      console.error('deleteThread Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
   getThread: (req, res) => {
     try {
       const thread = MemoryService.getThread(req.params.id);
